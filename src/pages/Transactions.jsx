@@ -1,29 +1,9 @@
 import { useState } from "react";
+import { useTransactions } from "../context/TransactionContext";
 
 function Transactions() {
-  const [transactions, setTransactions] = useState([
-    {
-      id: 1,
-      category: "Income",
-      title: "Salary",
-      type: "income",
-      amount: 100000,
-    },
-    {
-      id: 2,
-      category: "Entertainment",
-      title: "Movie",
-      type: "expense",
-      amount: 500,
-    },
-    {
-      id: 3,
-      category: "Shopping",
-      title: "Shopping",
-      type: "expense",
-      amount: 5500,
-    },
-  ]);
+  const { transactions, setTransactions, categories, setCategories } =
+  useTransactions();
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -31,13 +11,6 @@ function Transactions() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const [categories, setCategories] = useState([
-    "Food",
-    "Shopping",
-    "Entertainment",
-    "Travel",
-    "Bills",
-    ]);
 
     const [showCategoryForm, setShowCategoryForm] = useState(false);
     const [newCategory, setNewCategory] = useState("");
