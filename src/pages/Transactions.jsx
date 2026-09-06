@@ -1,8 +1,9 @@
 import { useState } from "react";
+
 import { useTransactions } from "../context/TransactionContext";
 
 function Transactions() {
-  const { transactions, setTransactions, categories, setCategories } =
+  const { transactions, setTransactions, categories, setCategories, createTransaction, editTransaction, removeTransaction } =
   useTransactions();
 
   const [search, setSearch] = useState("");
@@ -40,7 +41,7 @@ function Transactions() {
       [name]: value,
     });
   };
- const handleSubmit = (e) => {
+ const handleSubmit = async (e) => {
   e.preventDefault();
 
   if (!formData.title || !formData.amount) {
@@ -48,47 +49,34 @@ function Transactions() {
     return;
   }
 
-  if (editingId !== null) {
-    setTransactions(
-      transactions.map((transaction) =>
-        transaction.id === editingId
-          ? {
-              ...transaction,
-              title: formData.title,
-              category:
-                formData.type === "income"
-                  ? "Income"
-                  : formData.category,
-              type: formData.type,
-              amount: Number(formData.amount),
-            }
-          : transaction
-      )
-    );
-  } else {
-    const newTransaction = {
-      id: Date.now(),
-      title: formData.title,
-      category:
-        formData.type === "income"
-          ? "Income"
-          : formData.category,
-      type: formData.type,
-      amount: Number(formData.amount),
-    };
+  const transactionData = {
+    title: formData.title,
+    category:
+      formData.type === "income" ? "Income" : formData.category,
+    type: formData.type,
+    amount: Number(formData.amount),
+  };
 
-    setTransactions([...transactions, newTransaction]);
+  try {
+    if (editingId !== null) {
+      await editTransaction(editingId, transactionData);
+    } else {
+      await createTransaction(transactionData);
+    }
+
+    setEditingId(null);
+    setShowTransactionForm(false);
+
+    setFormData({
+      title: "",
+      category: categories[0] || "",
+      type: "expense",
+      amount: "",
+    });
+  } catch (error) {
+    console.error("Transaction operation failed:", error);
+    alert("Failed to save transaction.");
   }
-
-  setEditingId(null);
-  setShowTransactionForm(false);
-
-  setFormData({
-    title: "",
-    category: categories[0] || "",
-    type: "expense",
-    amount: "",
-  });
 };
   const handleAddCategory = () => {
   const category = newCategory.trim();
@@ -109,12 +97,14 @@ function Transactions() {
   setShowCategoryForm(false);
 };
 
-  const deleteTransaction = (id) => {
-    setTransactions(
-      transactions.filter((transaction) => transaction.id !== id),
-    );
-  };
-
+  const deleteTransaction = async (id) => {
+  try {
+    await removeTransaction(id);
+  } catch (error) {
+    console.error("Delete failed:", error);
+    alert("Failed to delete transaction.");
+  }
+};
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">

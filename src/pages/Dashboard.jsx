@@ -5,7 +5,7 @@ import { useTransactions } from "../context/TransactionContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { transactions, setTransactions, categories, setCategories } =
+  const { transactions, setTransactions, categories, setCategories, createTransaction, editTransaction,  removeTransaction, } =
   useTransactions();
 
   const [formData, setFormData] = useState({
@@ -31,7 +31,7 @@ export default function Dashboard() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.title || !formData.amount) {
@@ -48,14 +48,10 @@ export default function Dashboard() {
     };
 
     if (editingId) {
-      setTransactions(
-        transactions.map((transaction) =>
-          transaction.id === editingId ? newTransaction : transaction,
-        ),
-      );
-    } else {
-      setTransactions([...transactions, newTransaction]);
-    }
+  await editTransaction(editingId, newTransaction);
+} else {
+  await createTransaction(newTransaction);
+}
 
     setFormData({
       title: "",
@@ -88,7 +84,7 @@ export default function Dashboard() {
   };
 
   const handleEdit = (transaction) => {
-    setEditingId(transaction.id);
+    setEditingId(transaction._id);
 
     setFormData({
       title: transaction.title,
@@ -497,7 +493,7 @@ export default function Dashboard() {
               <tbody>
                 {transactions.map((t, index) => (
                   <tr
-                    key={index}
+                    key={t._id}
                     className="border-b border-gray-100 hover:bg-gray-50"
                   >
                     <td className="py-4">
@@ -567,13 +563,7 @@ export default function Dashboard() {
                           ✏️
                         </button>
                         <button
-                          onClick={() =>
-                            setTransactions(
-                              transactions.filter(
-                                (transaction) => transaction.id !== t.id,
-                              ),
-                            )
-                          }
+                          onClick={() => removeTransaction(t._id)}
                           className="text-red-500 hover:text-red-600"
                         >
                           🗑️
