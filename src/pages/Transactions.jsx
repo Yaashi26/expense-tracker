@@ -181,7 +181,7 @@ function Transactions() {
             <tbody>
               {filteredTransactions.map((transaction) => (
                 <tr
-                  key={transaction.id}
+                  key={transaction._id}
                   className="border-b border-gray-100 hover:bg-gray-50"
                 >
                   <td className="py-4 px-5">
@@ -212,7 +212,7 @@ function Transactions() {
                     <div className="flex gap-3">
                       <button
                         onClick={() => {
-                            setEditingId(transaction.id);
+                            setEditingId(transaction._id);
 
                             setFormData({
                             title: transaction.title,
@@ -251,8 +251,10 @@ function Transactions() {
 
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-gray-800">
-  {editingId ? "Update Transaction" : "Add Transaction"}
-</h3>
+          {editingId !== null
+          ? "Update Transaction"
+          : "Add Transaction"}
+        </h3> 
 
         <button
           type="button"

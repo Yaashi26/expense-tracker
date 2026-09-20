@@ -39,29 +39,41 @@ export default function Dashboard() {
       return;
     }
 
-    const newTransaction = {
-      id: Date.now(),
+    const transactionData = {
       title: formData.title,
-      category: formData.type === "income" ? "Income" : formData.category,
+      category:
+        formData.type === "income"
+          ? "Income"
+          : formData.category,
       type: formData.type,
       amount: Number(formData.amount),
     };
 
-    if (editingId) {
-  await editTransaction(editingId, newTransaction);
-} else {
-  await createTransaction(newTransaction);
-}
+    try {
+      if (editingId) {
+        await editTransaction(
+          editingId,
+          transactionData
+        );
+      } else {
+        await createTransaction(transactionData);
+      }
 
-    setFormData({
-      title: "",
-      category: "Food",
-      type: "expense",
-      amount: "",
-    });
+      setFormData({
+        title: "",
+        category: "Food",
+        type: "expense",
+        amount: "",
+      });
 
-    setEditingId(null);
-    setShowTransactionForm(false);
+      setEditingId(null);
+      setShowTransactionForm(false);
+    } catch (error) {
+      alert(
+        error.message ||
+          "Unable to save transaction."
+      );
+    }
   };
 
   const handleAddCategory = () => {
@@ -405,6 +417,13 @@ export default function Dashboard() {
             className="bg-gray-600 hover:bg-gray-700 text-white px-5 py-2 rounded-lg font-medium"
           >
             Add Category
+          </button>
+
+          <button
+              onClick={() => navigate("/financial-planning")}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-medium"
+            >
+              Smart Money Planner
           </button>
         </div>
       </div>

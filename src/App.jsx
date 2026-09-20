@@ -6,6 +6,7 @@ import Profile from "./pages/Profile";
 import Analytics from "./pages/Analytics";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import FinancialPlanning from "./pages/FinancialPlanning";
 
 function App() {
   return (
@@ -16,10 +17,15 @@ function App() {
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route
+            path="/financial-planning"
+            element={<FinancialPlanning />}
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
         <Route path="*" element={<Navigate to="/dashboard" />} />
+        
       </Routes>
     </BrowserRouter>
   );

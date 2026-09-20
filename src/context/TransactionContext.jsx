@@ -36,44 +36,51 @@ export function TransactionProvider({ children }) {
 
   // Add transaction
   const createTransaction = async (transaction) => {
-    try {
-      const newTransaction = await addTransaction(transaction);
+  try {
+    const newTransaction = await addTransaction(transaction);
 
-      setTransactions((prev) => [newTransaction, ...prev]);
-    } catch (error) {
-      console.error("Error adding transaction:", error);
-    }
+    setTransactions((prev) => [newTransaction, ...prev]);
+
+    return newTransaction;
+  } catch (error) {
+    console.error("Error adding transaction:", error);
+    throw error;
+  }
   };
 
   // Update transaction
   const editTransaction = async (id, transaction) => {
-    try {
-      const updatedTransaction = await updateTransaction(
-        id,
-        transaction
-      );
+  try {
+    const updatedTransaction = await updateTransaction(
+      id,
+      transaction
+    );
 
-      setTransactions((prev) =>
-        prev.map((item) =>
-          item._id === id ? updatedTransaction : item
-        )
-      );
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-    }
+    setTransactions((prev) =>
+      prev.map((item) =>
+        item._id === id ? updatedTransaction : item
+      )
+    );
+
+    return updatedTransaction;
+  } catch (error) {
+    console.error("Error updating transaction:", error);
+    throw error;
+  }
   };
 
   // Delete transaction
   const removeTransaction = async (id) => {
-    try {
-      await deleteTransaction(id);
+  try {
+    await deleteTransaction(id);
 
-      setTransactions((prev) =>
-        prev.filter((item) => item._id !== id)
-      );
-    } catch (error) {
-      console.error("Error deleting transaction:", error);
-    }
+    setTransactions((prev) =>
+      prev.filter((item) => item._id !== id)
+    );
+  } catch (error) {
+    console.error("Error deleting transaction:", error);
+    throw error;
+  }
   };
 
   return (
