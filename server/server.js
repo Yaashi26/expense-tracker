@@ -4,10 +4,12 @@ import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import authRoutes from "./routes/authRoutes.js";
 
 import transactionRoutes from "./routes/transactionRoutes.js";
 import financialRoutes from "./routes/financialRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+
 
 dotenv.config();
 
@@ -56,6 +58,7 @@ app.get("/", (req, res) => {
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/financial-settings", financialRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/auth", authRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -77,17 +80,19 @@ app.use((err, req, res, next) => {
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    message: "Route not found",
+    message: "API endpoint not found",
   });
 });
 
 // Centralized error handler
-app.use((error, req, res, next) => {
-  console.error(error);
+app.use((err, req, res, next) => {
+  console.error(err);
 
-  res.status(error.status || 500).json({
+  res.status(err.status || 500).json({
     message:
-      error.message || "Internal server error",
+      process.env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err.message || "Internal server error",
   });
 });
 
