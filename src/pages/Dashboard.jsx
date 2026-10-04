@@ -115,7 +115,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     const income = transactions
-      .filter((transaction) => transaction.type === "income")
+      .filter((transaction) =>
+         transaction.type === "income")
       .reduce((total, transaction) => total + transaction.amount, 0);
 
     const expense = transactions
@@ -220,6 +221,7 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500">
             Your trial ends in 30 days. Pay now to continue enjoying the
             service.
+            
           </p>
         </div>
 

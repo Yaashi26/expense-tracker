@@ -5,6 +5,19 @@ import mongoose from "mongoose";
 import Transaction from "../models/Transaction.js";
 import FinancialSettings from "../models/FinancialSettings.js";
 
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: errors.array(),
+    });
+  }
+
+  next();
+};
+
 const router = express.Router();
 
 // Get start and end of current month
