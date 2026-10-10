@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -17,6 +18,16 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
+    },
+    phone: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    currency: {
+      type: String,
+      enum: ["INR", "USD", "EUR", "GBP"],
+      default: "INR",
     },
     role: {
       type: String,

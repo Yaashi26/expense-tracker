@@ -143,6 +143,80 @@ router.get(
   }
 );
 
+
+router.patch(
+  "/profile",
+  verifyToken,
+  [
+    body("name").optional().trim().notEmpty().withMessage("Name cannot be empty"),
+    body("email").optional().isEmail().normalizeEmail().withMessage("Enter a valid email"),
+    body("phone").optional().isString().trim(),
+    body("currency")
+      .optional()
+      .isIn(["INR", "USD", "EUR", "GBP"])
+      .withMessage("Invalid currency"),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          message: "Invalid profile details",
+          errors: errors.array(),
+        });
+      }
+
+      const allowedFields = ["name", "email", "phone", "currency"];
+      const updates = {};
+
+      for (const field of allowedFields) {
+        if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+          updates[field] =
+            typeof req.body[field] === "string"
+              ? req.body[field].trim()
+              : req.body[field];
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({
+          message: "No profile details provided",
+        });
+      }
+
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { $set: updates },
+        {
+          new: true,
+          runValidators: true,
+        }
+      ).select("-password");
+
+      if (!user) {
+        return res.status(404).json({
+          message: "User not found",
+        });
+      }
+
+      return res.json({
+        message: "Profile updated successfully",
+        user,
+      });
+    } catch (error) {
+      if (error.code === 11000) {
+        return res.status(409).json({
+          message: "This email is already registered",
+        });
+      }
+
+      next(error);
+    }
+  }
+);
+
+
 // Admin-only route
 router.get(
   "/admin",

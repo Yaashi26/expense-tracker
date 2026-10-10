@@ -51,3 +51,23 @@ export const getUserProfile = async (token) => {
 
   return result;
 };
+
+
+export const updateUserProfile = async (token, data) => {
+  const response = await fetch(`${API_URL}/profile`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || "Profile update failed");
+  }
+
+  return result.user;
+};
