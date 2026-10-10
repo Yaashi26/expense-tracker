@@ -24,17 +24,9 @@ const router = express.Router();
 const getCurrentMonthRange = () => {
   const now = new Date();
 
-  const start = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1
-  );
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const end = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    1
-  );
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   return { start, end };
 };
@@ -67,9 +59,8 @@ const checkSpendingLimit = async (additionalExpense, excludeId = null) => {
   const transactions = await Transaction.find(query);
 
   const currentExpense = transactions.reduce(
-    (total, transaction) =>
-      total + Number(transaction.amount),
-    0
+    (total, transaction) => total + Number(transaction.amount),
+    0,
   );
 
   const incomeTransactions = await Transaction.find({
@@ -81,17 +72,14 @@ const checkSpendingLimit = async (additionalExpense, excludeId = null) => {
   });
 
   const currentIncome = incomeTransactions.reduce(
-    (total, transaction) =>
-      total + Number(transaction.amount),
-    0
+    (total, transaction) => total + Number(transaction.amount),
+    0,
   );
 
   const newExpense = currentExpense + additionalExpense;
 
   const spendingPercentage =
-    currentIncome > 0
-      ? (newExpense / currentIncome) * 100
-      : 0;
+    currentIncome > 0 ? (newExpense / currentIncome) * 100 : 0;
 
   return {
     allowed:
@@ -128,9 +116,7 @@ router.get("/:id", async (req, res, next) => {
       });
     }
 
-    const transaction = await Transaction.findById(
-      req.params.id
-    );
+    const transaction = await Transaction.findById(req.params.id);
 
     if (!transaction) {
       return res.status(404).json({
@@ -155,10 +141,7 @@ router.post(
       .isLength({ max: 100 })
       .withMessage("Title cannot exceed 100 characters."),
 
-    body("category")
-      .trim()
-      .notEmpty()
-      .withMessage("Category is required."),
+    body("category").trim().notEmpty().withMessage("Category is required."),
 
     body("type")
       .isIn(["income", "expense"])
@@ -179,33 +162,23 @@ router.post(
         });
       }
 
-      const {
-        title,
-        category,
-        type,
-        amount,
-      } = req.body;
+      const { title, category, type, amount } = req.body;
 
       // Apply spending limit only to expenses
       if (type === "expense") {
-        const limitCheck = await checkSpendingLimit(
-          Number(amount)
-        );
+        const limitCheck = await checkSpendingLimit(Number(amount));
 
         if (!limitCheck.allowed) {
           return res.status(400).json({
-            message:
-              "Spending limit reached. This expense cannot be added.",
+            message: "Spending limit reached. This expense cannot be added.",
             details: {
               currentIncome: limitCheck.currentIncome,
               currentExpense: limitCheck.currentExpense,
               attemptedExpense: limitCheck.newExpense,
-              spendingPercentage:
-                Number(
-                  limitCheck.spendingPercentage.toFixed(2)
-                ),
-              limitPercentage:
-                limitCheck.limitPercentage,
+              spendingPercentage: Number(
+                limitCheck.spendingPercentage.toFixed(2),
+              ),
+              limitPercentage: limitCheck.limitPercentage,
             },
           });
         }
@@ -218,35 +191,28 @@ router.post(
         amount: Number(amount),
       });
 
+      req.app.get("io").emit("transaction:update", {
+        message: "A new transaction was added successfully!",
+      });
+
       res.status(201).json(transaction);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PUT transaction
 router.put(
   "/:id",
   [
-    body("title")
-      .optional()
-      .trim()
-      .notEmpty()
-      .isLength({ max: 100 }),
+    body("title").optional().trim().notEmpty().isLength({ max: 100 }),
 
-    body("category")
-      .optional()
-      .trim()
-      .notEmpty(),
+    body("category").optional().trim().notEmpty(),
 
-    body("type")
-      .optional()
-      .isIn(["income", "expense"]),
+    body("type").optional().isIn(["income", "expense"]),
 
-    body("amount")
-      .optional()
-      .isFloat({ min: 0.01 }),
+    body("amount").optional().isFloat({ min: 0.01 }),
   ],
   async (req, res, next) => {
     try {
@@ -265,8 +231,7 @@ router.put(
         });
       }
 
-      const existingTransaction =
-        await Transaction.findById(req.params.id);
+      const existingTransaction = await Transaction.findById(req.params.id);
 
       if (!existingTransaction) {
         return res.status(404).json({
@@ -274,8 +239,7 @@ router.put(
         });
       }
 
-      const updatedType =
-        req.body.type || existingTransaction.type;
+      const updatedType = req.body.type || existingTransaction.type;
 
       const updatedAmount =
         req.body.amount !== undefined
@@ -286,43 +250,43 @@ router.put(
       if (updatedType === "expense") {
         const limitCheck = await checkSpendingLimit(
           updatedAmount,
-          req.params.id
+          req.params.id,
         );
 
         if (!limitCheck.allowed) {
           return res.status(400).json({
-            message:
-              "Spending limit reached. This update cannot be saved.",
+            message: "Spending limit reached. This update cannot be saved.",
             details: {
               currentIncome: limitCheck.currentIncome,
               currentExpense: limitCheck.currentExpense,
               attemptedExpense: limitCheck.newExpense,
-              spendingPercentage:
-                Number(
-                  limitCheck.spendingPercentage.toFixed(2)
-                ),
-              limitPercentage:
-                limitCheck.limitPercentage,
+              spendingPercentage: Number(
+                limitCheck.spendingPercentage.toFixed(2),
+              ),
+              limitPercentage: limitCheck.limitPercentage,
             },
           });
         }
       }
 
-      const transaction =
-        await Transaction.findByIdAndUpdate(
-          req.params.id,
-          req.body,
-          {
-            new: true,
-            runValidators: true,
-          }
-        );
+      const transaction = await Transaction.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        {
+          new: true,
+          runValidators: true,
+        },
+      );
+
+      req.app.get("io").emit("transaction:update", {
+        message: "A transaction was updated successfully!",
+      });
 
       res.json(transaction);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // DELETE transaction
@@ -334,14 +298,17 @@ router.delete("/:id", async (req, res, next) => {
       });
     }
 
-    const transaction =
-      await Transaction.findByIdAndDelete(req.params.id);
+    const transaction = await Transaction.findByIdAndDelete(req.params.id);
 
     if (!transaction) {
       return res.status(404).json({
         message: "Transaction not found",
       });
     }
+
+    req.app.get("io").emit("transaction:update", {
+      message: "A transaction was deleted successfully!",
+    });
 
     res.json({
       message: "Transaction deleted successfully",

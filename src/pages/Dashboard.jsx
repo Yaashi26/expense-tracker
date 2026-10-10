@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { CircleUserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTransactions } from "../context/TransactionContext";
+import { socket } from "../services/socket";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -30,6 +31,8 @@ export default function Dashboard() {
       [name]: value,
     });
   };
+
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -155,6 +158,18 @@ export default function Dashboard() {
 
     setLeastSpentCategory(leastSpent);
   }, [transactions]);
+
+  useEffect(() => {
+  const handleTransactionUpdate = (data) => {
+    alert(data.message);
+  };
+
+  socket.on("transaction:update", handleTransactionUpdate);
+
+  return () => {
+    socket.off("transaction:update", handleTransactionUpdate);
+  };
+}, []);
 
   const expenseByCategory = {};
 
