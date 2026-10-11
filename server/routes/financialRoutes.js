@@ -1,20 +1,27 @@
+
 import express from "express";
 import { body, validationResult } from "express-validator";
+
 import FinancialSettings from "../models/FinancialSettings.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// GET financial settings
+router.use(verifyToken);
+
+// GET logged-in user's financial settings
 router.get("/", async (req, res, next) => {
   try {
-    let settings = await FinancialSettings.findOne();
-
-    if (!settings) {
-      settings = await FinancialSettings.create({
-        monthlySavingsTarget: 0,
-        spendingLimitPercentage: 70,
-      });
-    }
+    const settings = await FinancialSettings.findOneAndUpdate(
+      { userId: req.user.id },
+      {
+        $setOnInsert: {
+          monthlySavingsTarget: 0,
+          spendingLimitPercentage: 70,
+        },
+      },
+      { new: true, upsert: true, runValidators: true }
+    );
 
     res.json(settings);
   } catch (error) {
@@ -22,14 +29,13 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// UPDATE financial settings
+// UPDATE logged-in user's financial settings
 router.put(
   "/",
   [
     body("monthlySavingsTarget")
       .isFloat({ min: 0 })
       .withMessage("Savings target must be a non-negative number."),
-
     body("spendingLimitPercentage")
       .isFloat({ min: 1, max: 100 })
       .withMessage("Spending limit must be between 1 and 100."),
@@ -45,24 +51,20 @@ router.put(
         });
       }
 
-      const {
-        monthlySavingsTarget,
-        spendingLimitPercentage,
-      } = req.body;
-
       const settings = await FinancialSettings.findOneAndUpdate(
-        {},
+        { userId: req.user.id },
         {
-          monthlySavingsTarget: Number(monthlySavingsTarget),
-          spendingLimitPercentage: Number(
-            spendingLimitPercentage
-          ),
+          $set: {
+            monthlySavingsTarget: Number(req.body.monthlySavingsTarget),
+            spendingLimitPercentage: Number(
+              req.body.spendingLimitPercentage
+            ),
+          },
+          $setOnInsert: {
+            userId: req.user.id,
+          },
         },
-        {
-          new: true,
-          upsert: true,
-          runValidators: true,
-        }
+        { new: true, upsert: true, runValidators: true }
       );
 
       res.json(settings);

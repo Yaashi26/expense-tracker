@@ -2,6 +2,14 @@ import mongoose from "mongoose";
 
 const financialSettingsSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+      index: true,
+    },
+
     monthlySavingsTarget: {
       type: Number,
       required: true,

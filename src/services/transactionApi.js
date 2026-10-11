@@ -1,8 +1,21 @@
+
 const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/transactions`;
+
+// Get authentication token
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token");
+
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+};
 
 // Get all transactions
 export const getTransactions = async () => {
-  const response = await fetch(API_URL);
+  const response = await fetch(API_URL, {
+    headers: getAuthHeaders(),
+  });
 
   if (!response.ok) {
     throw new Error("Failed to fetch transactions");
@@ -11,13 +24,11 @@ export const getTransactions = async () => {
   return response.json();
 };
 
-// Post transaction
+// Add transaction
 export const addTransaction = async (transaction) => {
   const response = await fetch(API_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(transaction),
   });
 
@@ -30,7 +41,9 @@ export const addTransaction = async (transaction) => {
 
 // Get transaction by ID
 export const getTransactionById = async (id) => {
-  const response = await fetch(`${API_URL}/${id}`);
+  const response = await fetch(`${API_URL}/${id}`, {
+    headers: getAuthHeaders(),
+  });
 
   if (!response.ok) {
     throw new Error("Failed to fetch transaction");
@@ -43,9 +56,7 @@ export const getTransactionById = async (id) => {
 export const updateTransaction = async (id, transaction) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(transaction),
   });
 
@@ -60,6 +71,7 @@ export const updateTransaction = async (id, transaction) => {
 export const deleteTransaction = async (id) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: "DELETE",
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
