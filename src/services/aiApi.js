@@ -1,5 +1,4 @@
-const API_URL =
-  "http://localhost:5000/api/ai/suggestions";
+const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/ai/suggestions`;
 
 export const getAISuggestions = async (data) => {
   const response = await fetch(API_URL, {
