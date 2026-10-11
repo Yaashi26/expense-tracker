@@ -1,14 +1,31 @@
 
 const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/transactions`;
 
-// Get authentication token
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error("Session expired. Please log in again.");
+  }
 
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   };
+};
+
+const handleResponse = async (response, defaultMessage) => {
+  const data = await response.json().catch(() => ({}));
+
+  if (response.status === 401) {
+    throw new Error("Session expired or invalid. Please log in again.");
+  }
+
+  if (!response.ok) {
+    throw new Error(data.message || defaultMessage);
+  }
+
+  return data;
 };
 
 // Get all transactions
@@ -17,11 +34,7 @@ export const getTransactions = async () => {
     headers: getAuthHeaders(),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch transactions");
-  }
-
-  return response.json();
+  return handleResponse(response, "Failed to fetch transactions");
 };
 
 // Add transaction
@@ -32,11 +45,7 @@ export const addTransaction = async (transaction) => {
     body: JSON.stringify(transaction),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to add transaction");
-  }
-
-  return response.json();
+  return handleResponse(response, "Failed to add transaction");
 };
 
 // Get transaction by ID
@@ -45,11 +54,7 @@ export const getTransactionById = async (id) => {
     headers: getAuthHeaders(),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch transaction");
-  }
-
-  return response.json();
+  return handleResponse(response, "Failed to fetch transaction");
 };
 
 // Update transaction
@@ -60,11 +65,7 @@ export const updateTransaction = async (id, transaction) => {
     body: JSON.stringify(transaction),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to update transaction");
-  }
-
-  return response.json();
+  return handleResponse(response, "Failed to update transaction");
 };
 
 // Delete transaction
@@ -74,9 +75,5 @@ export const deleteTransaction = async (id) => {
     headers: getAuthHeaders(),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to delete transaction");
-  }
-
-  return response.json();
+  return handleResponse(response, "Failed to delete transaction");
 };
