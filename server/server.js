@@ -1,5 +1,14 @@
 import dotenv from "dotenv";
-dotenv.config({ path: "../.env" });
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+console.log("API KEY FOUND:", !!process.env.RESEND_API_KEY);
+// console.log("Resend key loaded:", !!process.env.RESEND_API_KEY);
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -14,6 +23,8 @@ import aiRoutes from "./routes/aiRoutes.js";
 
 import http from "http";
 import { Server } from "socket.io";
+
+import emailRoutes from "./routes/email.js";
 
 
 const app = express();
@@ -34,6 +45,8 @@ app.use(
 
 // Limit request body size
 app.use(express.json({ limit: "10kb" }));
+
+app.use("/api/email", emailRoutes);
 
 // Rate limiting
 const apiLimiter = rateLimit({

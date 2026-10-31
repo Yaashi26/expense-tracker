@@ -1,4 +1,7 @@
 
+import User from "../models/User.js";
+import SpendingAlert from "../models/SpendingAlert.js";
+import { sendEmail } from "../services/emailService.js";
 import express from "express";
 import { body, validationResult } from "express-validator";
 import mongoose from "mongoose";
@@ -33,6 +36,98 @@ const getUserSettings = async (userId) => {
     },
     { new: true, upsert: true, runValidators: true }
   );
+};
+
+// Send one spending-limit alert per user per month
+const checkAndSendSpendingAlert = async (userId) => {
+  try {
+    const settings = await getUserSettings(userId);
+    const user = await User.findById(userId);
+
+    if (!user) return;
+
+    const { start, end } = getCurrentMonthRange();
+
+    const expenses = await Transaction.find({
+      userId,
+      type: "expense",
+      createdAt: { $gte: start, $lt: end },
+    });
+
+    const incomes = await Transaction.find({
+      userId,
+      type: "income",
+      createdAt: { $gte: start, $lt: end },
+    });
+
+    const totalExpense = expenses.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0
+    );
+
+    const totalIncome = incomes.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0
+    );
+
+    if (totalIncome <= 0) return;
+
+    const threshold =
+      (totalIncome * settings.spendingLimitPercentage) / 100;
+
+    if (totalExpense < threshold) return;
+
+    const month = `${start.getFullYear()}-${String(
+      start.getMonth() + 1
+    ).padStart(2, "0")}`;
+
+    // Claim this month's alert so it cannot be sent twice
+    const alert = await SpendingAlert.findOneAndUpdate(
+      { userId, month },
+      {
+        $setOnInsert: {
+          userId,
+          month,
+          limitPercentage: settings.spendingLimitPercentage,
+          thresholdAmount: threshold,
+        },
+      },
+      { upsert: true, new: false }
+    );
+
+    // Existing alert means notification was already attempted
+    if (alert) return;
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "Expense Tracker - Monthly Spending Limit Reached",
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Hello ${user.name}!</h2>
+            <h3>Your monthly spending limit has been reached.</h3>
+            <p><strong>Monthly Income:</strong> ₹${totalIncome.toFixed(2)}</p>
+            <p><strong>Monthly Expenses:</strong> ₹${totalExpense.toFixed(2)}</p>
+            <p><strong>Spending Limit:</strong> ${settings.spendingLimitPercentage}%</p>
+            <p><strong>Limit Amount:</strong> ₹${threshold.toFixed(2)}</p>
+            <p>Please review your expenses and manage your remaining budget carefully.</p>
+            <p>Regards,<br/>Expense Tracker Team</p>
+          </div>
+        `,
+      });
+
+      console.log(`Spending alert sent to ${user.email}`);
+    } catch (emailError) {
+      // Allow another transaction to retry if email delivery fails
+      await SpendingAlert.deleteOne({ _id: (await SpendingAlert.findOne({ userId, month }))?._id });
+      console.error("Spending alert email failed:", emailError.message);
+    }
+  } catch (error) {
+    // A concurrent request may have already created this month's alert
+    if (error.code !== 11000) {
+      console.error("Spending alert check failed:", error.message);
+    }
+  }
 };
 
 // Check spending limit using only this user's transactions
@@ -184,6 +279,10 @@ router.post(
         amount: Number(amount),
       });
 
+      if (type === "expense") {
+        await checkAndSendSpendingAlert(req.user.id);
+      }
+
       req.app.get("io")?.emit("transaction:update", {
         userId: req.user.id,
         message: "A new transaction was added successfully!",
@@ -266,6 +365,9 @@ router.put(
         safeUpdates,
         { new: true, runValidators: true }
       );
+      if (transaction.type === "expense") {
+        await checkAndSendSpendingAlert(req.user.id);
+      }
 
       req.app.get("io")?.emit("transaction:update", {
         userId: req.user.id,
