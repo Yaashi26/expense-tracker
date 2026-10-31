@@ -30,6 +30,11 @@ function Signup() {
         password,
       });
 
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      window.dispatchEvent(new Event("auth-change"));
+
       alert("Signup successful. Please login.");
       navigate("/login");
     } catch (err) {
