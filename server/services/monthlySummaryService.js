@@ -17,7 +17,7 @@ const escapeHtml = (value) =>
     };
 
     return entities[character];
-  };
+  });
 
 const getPreviousMonthDetails = () => {
   const nowIST = new Date(Date.now() + IST_OFFSET);
