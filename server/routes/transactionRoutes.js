@@ -1,28 +1,51 @@
+import express from "express";
+import mongoose from "mongoose";
+import { body, validationResult } from "express-validator";
 
 import User from "../models/User.js";
-import SpendingAlert from "../models/SpendingAlert.js";
-import { sendEmail } from "../services/emailService.js";
-import express from "express";
-import { body, validationResult } from "express-validator";
-import mongoose from "mongoose";
-
 import Transaction from "../models/Transaction.js";
 import FinancialSettings from "../models/FinancialSettings.js";
+import SpendingAlert from "../models/SpendingAlert.js";
+import { sendEmail } from "../services/emailService.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Protect every transaction route
 router.use(verifyToken);
 
+const IST_OFFSET = 330 * 60 * 1000;
+
+// Get current month range using Indian Standard Time
 const getCurrentMonthRange = () => {
-  const now = new Date();
+  const nowIST = new Date(Date.now() + IST_OFFSET);
+  const year = nowIST.getUTCFullYear();
+  const month = nowIST.getUTCMonth();
 
   return {
-    start: new Date(now.getFullYear(), now.getMonth(), 1),
-    end: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    start: new Date(Date.UTC(year, month, 1) - IST_OFFSET),
+    end: new Date(Date.UTC(year, month + 1, 1) - IST_OFFSET),
   };
 };
+
+const getCurrentMonthKey = () => {
+  const nowIST = new Date(Date.now() + IST_OFFSET);
+  return `${nowIST.getUTCFullYear()}-${String(
+    nowIST.getUTCMonth() + 1
+  ).padStart(2, "0")}`;
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (character) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+
+    return entities[character];
+  });
 
 // Get or create settings for the logged-in user
 const getUserSettings = async (userId) => {
@@ -38,7 +61,43 @@ const getUserSettings = async (userId) => {
   );
 };
 
-// Send one spending-limit alert per user per month
+// Send transaction confirmation email
+const sendTransactionConfirmation = async (userId, transaction) => {
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) return;
+
+    const transactionType =
+      transaction.type === "income" ? "Income" : "Expense";
+
+    await sendEmail({
+      to: user.email,
+      subject: `Expense Tracker - ${transactionType} Added`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2>Hello ${escapeHtml(user.name)}!</h2>
+          <p>Your ${transactionType.toLowerCase()} transaction has been added successfully.</p>
+
+          <h3>Transaction Details</h3>
+          <p><strong>Title:</strong> ${escapeHtml(transaction.title)}</p>
+          <p><strong>Category:</strong> ${escapeHtml(transaction.category)}</p>
+          <p><strong>Type:</strong> ${transactionType}</p>
+          <p><strong>Amount:</strong> ₹${Number(transaction.amount).toFixed(2)}</p>
+
+          <p>Thank you for using Expense Tracker!</p>
+          <p>Team Expense Tracker</p>
+        </div>
+      `,
+    });
+
+    console.log(`Transaction confirmation sent to ${user.email}`);
+  } catch (error) {
+    console.error("Transaction confirmation failed:", error.message);
+  }
+};
+
+// Check and send one spending-limit alert per user per month
 const checkAndSendSpendingAlert = async (userId) => {
   try {
     const settings = await getUserSettings(userId);
@@ -48,68 +107,58 @@ const checkAndSendSpendingAlert = async (userId) => {
 
     const { start, end } = getCurrentMonthRange();
 
-    const expenses = await Transaction.find({
+    const monthlyTransactions = await Transaction.find({
       userId,
-      type: "expense",
       createdAt: { $gte: start, $lt: end },
     });
 
-    const incomes = await Transaction.find({
-      userId,
-      type: "income",
-      createdAt: { $gte: start, $lt: end },
-    });
+    const totalExpense = monthlyTransactions
+      .filter((item) => item.type === "expense")
+      .reduce((sum, item) => sum + Number(item.amount), 0);
 
-    const totalExpense = expenses.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0
-    );
-
-    const totalIncome = incomes.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0
-    );
+    const totalIncome = monthlyTransactions
+      .filter((item) => item.type === "income")
+      .reduce((sum, item) => sum + Number(item.amount), 0);
 
     if (totalIncome <= 0) return;
 
-    const threshold =
-      (totalIncome * settings.spendingLimitPercentage) / 100;
+    const limitPercentage = settings.spendingLimitPercentage;
+    const threshold = (totalIncome * limitPercentage) / 100;
 
     if (totalExpense < threshold) return;
 
-    const month = `${start.getFullYear()}-${String(
-      start.getMonth() + 1
-    ).padStart(2, "0")}`;
+    const month = getCurrentMonthKey();
 
-    // Claim this month's alert so it cannot be sent twice
-    const alert = await SpendingAlert.findOneAndUpdate(
-      { userId, month },
-      {
-        $setOnInsert: {
-          userId,
-          month,
-          limitPercentage: settings.spendingLimitPercentage,
-          thresholdAmount: threshold,
-        },
-      },
-      { upsert: true, new: false }
-    );
+    // Create a unique alert record to prevent duplicate emails
+    let alertRecord;
 
-    // Existing alert means notification was already attempted
-    if (alert) return;
+    try {
+      alertRecord = await SpendingAlert.create({
+        userId,
+        month,
+        limitPercentage,
+        thresholdAmount: threshold,
+      });
+    } catch (error) {
+      // An alert already exists for this user and month
+      if (error.code === 11000) return;
+      throw error;
+    }
 
     try {
       await sendEmail({
         to: user.email,
         subject: "Expense Tracker - Monthly Spending Limit Reached",
         html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Hello ${user.name}!</h2>
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2>Hello ${escapeHtml(user.name)}!</h2>
             <h3>Your monthly spending limit has been reached.</h3>
+
             <p><strong>Monthly Income:</strong> ₹${totalIncome.toFixed(2)}</p>
             <p><strong>Monthly Expenses:</strong> ₹${totalExpense.toFixed(2)}</p>
-            <p><strong>Spending Limit:</strong> ${settings.spendingLimitPercentage}%</p>
+            <p><strong>Spending Limit:</strong> ${limitPercentage}%</p>
             <p><strong>Limit Amount:</strong> ₹${threshold.toFixed(2)}</p>
+
             <p>Please review your expenses and manage your remaining budget carefully.</p>
             <p>Regards,<br/>Expense Tracker Team</p>
           </div>
@@ -118,15 +167,16 @@ const checkAndSendSpendingAlert = async (userId) => {
 
       console.log(`Spending alert sent to ${user.email}`);
     } catch (emailError) {
-      // Allow another transaction to retry if email delivery fails
-      await SpendingAlert.deleteOne({ _id: (await SpendingAlert.findOne({ userId, month }))?._id });
+      // Delete only the record created by this request, allowing a retry
+      await SpendingAlert.deleteOne({
+        _id: alertRecord._id,
+        userId,
+      });
+
       console.error("Spending alert email failed:", emailError.message);
     }
   } catch (error) {
-    // A concurrent request may have already created this month's alert
-    if (error.code !== 11000) {
-      console.error("Spending alert check failed:", error.message);
-    }
+    console.error("Spending alert check failed:", error.message);
   }
 };
 
@@ -151,6 +201,7 @@ const checkSpendingLimit = async (
   }
 
   const expenses = await Transaction.find(expenseQuery);
+
   const incomes = await Transaction.find({
     ...baseQuery,
     type: "income",
@@ -190,7 +241,7 @@ router.get("/", async (req, res, next) => {
       userId: req.user.id,
     }).sort({ createdAt: -1 });
 
-    res.json(transactions);
+    return res.json(transactions);
   } catch (error) {
     next(error);
   }
@@ -200,7 +251,9 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid transaction ID" });
+      return res.status(400).json({
+        message: "Invalid transaction ID",
+      });
     }
 
     const transaction = await Transaction.findOne({
@@ -209,10 +262,12 @@ router.get("/:id", async (req, res, next) => {
     });
 
     if (!transaction) {
-      return res.status(404).json({ message: "Transaction not found" });
+      return res.status(404).json({
+        message: "Transaction not found",
+      });
     }
 
-    res.json(transaction);
+    return res.json(transaction);
   } catch (error) {
     next(error);
   }
@@ -228,7 +283,10 @@ router.post(
       .withMessage("Title is required.")
       .isLength({ max: 100 })
       .withMessage("Title cannot exceed 100 characters."),
-    body("category").trim().notEmpty().withMessage("Category is required."),
+    body("category")
+      .trim()
+      .notEmpty()
+      .withMessage("Category is required."),
     body("type")
       .isIn(["income", "expense"])
       .withMessage("Type must be income or expense."),
@@ -279,16 +337,18 @@ router.post(
         amount: Number(amount),
       });
 
-      if (type === "expense") {
-        await checkAndSendSpendingAlert(req.user.id);
-      }
+      // Transaction confirmation email
+      await sendTransactionConfirmation(req.user.id, transaction);
+
+      // Recheck the user's spending limit after the transaction is saved
+      await checkAndSendSpendingAlert(req.user.id);
 
       req.app.get("io")?.emit("transaction:update", {
         userId: req.user.id,
         message: "A new transaction was added successfully!",
       });
 
-      res.status(201).json(transaction);
+      return res.status(201).json(transaction);
     } catch (error) {
       next(error);
     }
@@ -307,7 +367,9 @@ router.put(
   async (req, res, next) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: "Invalid transaction ID" });
+        return res.status(400).json({
+          message: "Invalid transaction ID",
+        });
       }
 
       const errors = validationResult(req);
@@ -325,7 +387,9 @@ router.put(
       });
 
       if (!existingTransaction) {
-        return res.status(404).json({ message: "Transaction not found" });
+        return res.status(404).json({
+          message: "Transaction not found",
+        });
       }
 
       const updatedType = req.body.type || existingTransaction.type;
@@ -357,24 +421,30 @@ router.put(
         }
       }
 
-      // Never allow the client to change ownership through the request body.
+      // Prevent clients from changing transaction ownership
       const { userId, _id, ...safeUpdates } = req.body;
 
       const transaction = await Transaction.findOneAndUpdate(
-        { _id: req.params.id, userId: req.user.id },
+        {
+          _id: req.params.id,
+          userId: req.user.id,
+        },
         safeUpdates,
-        { new: true, runValidators: true }
+        {
+          new: true,
+          runValidators: true,
+        }
       );
-      if (transaction.type === "expense") {
-        await checkAndSendSpendingAlert(req.user.id);
-      }
+
+      // Recheck after any edit, including income edits
+      await checkAndSendSpendingAlert(req.user.id);
 
       req.app.get("io")?.emit("transaction:update", {
         userId: req.user.id,
         message: "A transaction was updated successfully!",
       });
 
-      res.json(transaction);
+      return res.json(transaction);
     } catch (error) {
       next(error);
     }
@@ -385,7 +455,9 @@ router.put(
 router.delete("/:id", async (req, res, next) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid transaction ID" });
+      return res.status(400).json({
+        message: "Invalid transaction ID",
+      });
     }
 
     const transaction = await Transaction.findOneAndDelete({
@@ -394,15 +466,22 @@ router.delete("/:id", async (req, res, next) => {
     });
 
     if (!transaction) {
-      return res.status(404).json({ message: "Transaction not found" });
+      return res.status(404).json({
+        message: "Transaction not found",
+      });
     }
+
+    // Recheck in case deleting income changes the spending percentage
+    await checkAndSendSpendingAlert(req.user.id);
 
     req.app.get("io")?.emit("transaction:update", {
       userId: req.user.id,
       message: "A transaction was deleted successfully!",
     });
 
-    res.json({ message: "Transaction deleted successfully" });
+    return res.json({
+      message: "Transaction deleted successfully",
+    });
   } catch (error) {
     next(error);
   }

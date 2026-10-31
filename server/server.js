@@ -26,6 +26,8 @@ import { Server } from "socket.io";
 
 import emailRoutes from "./routes/email.js";
 
+import { startMonthlySummaryJob } from "./services/monthlySummaryService.js";
+
 
 const app = express();
 
@@ -120,6 +122,8 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected successfully");
+
+    startMonthlySummaryJob();
 
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

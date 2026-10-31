@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { body, validationResult } from "express-validator";
 import User from "../models/User.js";
+import { sendEmail } from "../services/emailService.js";
 import {
   verifyToken,
   verifyAdmin,
@@ -39,10 +40,7 @@ router.post(
         });
       }
 
-      const hashedPassword = await bcrypt.hash(
-        password,
-        10
-      );
+      const hashedPassword = await bcrypt.hash(password, 10);
 
       const user = await User.create({
         name,
@@ -51,7 +49,29 @@ router.post(
         role: "user",
       });
 
-      res.status(201).json({
+      // Welcome email notification
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: "Welcome to Expense Tracker!",
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+              <h2>Welcome to Expense Tracker!</h2>
+              <p>Hello ${user.name},</p>
+              <p>Your account has been created successfully.</p>
+              <p>You can now manage your income, expenses and savings in one place.</p>
+              <p>Thank you for joining us!</p>
+              <h3>Team Expense Tracker</h3>
+            </div>
+          `,
+        });
+
+        console.log("Welcome email sent to:", user.email);
+      } catch (emailError) {
+        console.error("Welcome email failed:", emailError.message);
+      }
+
+      return res.status(201).json({
         message: "Signup successful",
         user: {
           id: user._id,
@@ -105,7 +125,7 @@ router.post(
         { expiresIn: "1h" }
       );
 
-      res.json({
+      return res.json({
         message: "Login successful",
         token,
         user: {
@@ -136,21 +156,32 @@ router.get(
         });
       }
 
-      res.json(user);
+      return res.json(user);
     } catch (error) {
       next(error);
     }
   }
 );
 
-
+// Update profile
 router.patch(
   "/profile",
   verifyToken,
   [
-    body("name").optional().trim().notEmpty().withMessage("Name cannot be empty"),
-    body("email").optional().isEmail().normalizeEmail().withMessage("Enter a valid email"),
-    body("phone").optional().isString().trim(),
+    body("name")
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage("Name cannot be empty"),
+    body("email")
+      .optional()
+      .isEmail()
+      .normalizeEmail()
+      .withMessage("Enter a valid email"),
+    body("phone")
+      .optional()
+      .isString()
+      .trim(),
     body("currency")
       .optional()
       .isIn(["INR", "USD", "EUR", "GBP"])
@@ -215,7 +246,6 @@ router.patch(
     }
   }
 );
-
 
 // Admin-only route
 router.get(
