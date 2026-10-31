@@ -32,6 +32,11 @@ export default function Dashboard() {
     });
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
   
 
   const handleSubmit = async (e) => {
@@ -211,7 +216,7 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/login")}
+            onClick={handleLogout}
             className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
           >
             Logout
