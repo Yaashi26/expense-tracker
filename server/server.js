@@ -1,7 +1,9 @@
+import dotenv from "dotenv";
+dotenv.config({ path: "../.env" });
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
@@ -12,7 +14,7 @@ import aiRoutes from "./routes/aiRoutes.js";
 
 import http from "http";
 import { Server } from "socket.io";
-dotenv.config();
+
 
 const app = express();
 
@@ -36,7 +38,7 @@ app.use(express.json({ limit: "10kb" }));
 // Rate limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 500,
+  limit: 5,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {
