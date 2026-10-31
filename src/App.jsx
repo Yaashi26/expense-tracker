@@ -10,7 +10,7 @@ import Profile from "./pages/Profile";
 import Analytics from "./pages/Analytics";
 import FinancialPlanning from "./pages/FinancialPlanning";
 
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
   return (
