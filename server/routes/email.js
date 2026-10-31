@@ -31,6 +31,6 @@ router.post("/test", async (req, res) => {
   res.status(500).json({
     message: "Failed to send test email",
   });
-}
-
+ }
+});
 export default router;
